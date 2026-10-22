@@ -2,9 +2,10 @@ python-telegram-bot
 supabase
 requests
 
-flask==3.0.2
-python-telegram-bot==20.7
-supabase==2.3.0
+Flask
+python-telegram-bot
+supabase
+
 
 
 
