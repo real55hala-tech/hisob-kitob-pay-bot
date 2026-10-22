@@ -1,5 +1,7 @@
 import os
 import logging
+import threading
+from flask import Flask
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import (
     ApplicationBuilder,
@@ -14,12 +16,23 @@ from supabase import create_client, Client
 # Logging sozlamalari
 logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s', level=logging.INFO)
 
+# 🌐 Render.com Port muammosini hal qilish uchun kichik Veb-Server
+flask_app = Flask(__name__)
+
+@flask_app.route('/')
+def health_check():
+    return "Hisob-Kitob Bot Is Running Active!", 200
+
+def run_flask():
+    port = int(os.environ.get("PORT", 10000))
+    flask_app.run(host="0.0.0.0", port=port)
+
 # Atrof-muhit o'zgaruvchilari
 BOT_TOKEN = os.getenv("BOT_TOKEN")
 SUPABASE_URL = os.getenv("SUPABASE_URL")
 SUPABASE_KEY = os.getenv("SUPABASE_KEY")
 
-# 👨‍💻 Admin Telegram ID (Sizning ID raqamingiz biriktirildi)
+# 👨‍💻 Admin Telegram ID
 ADMIN_CHAT_ID = os.getenv("ADMIN_CHAT_ID", "8186445673")
 
 # 💳 Rasmiy To'lov Sozlamalari
@@ -31,7 +44,7 @@ supabase: Client = None
 if SUPABASE_URL and SUPABASE_KEY:
     supabase = create_client(SUPABASE_URL, SUPABASE_KEY)
 
-# 🌐 Ko'ptillilik lug'ati (Uzbek, Russian, English)
+# 🌐 Ko'ptillilik lug'ati
 TEXTS = {
     'uz': {
         'welcome': "Assalomu alaykum! **Hisob-Kitob** to'lov botiga xush kelibsiz! 🚀\n\nIltimos, tilni tanlang / Пожалуйста, выберите язык:",
@@ -89,7 +102,6 @@ TEXTS = {
     }
 }
 
-# Foydalanuvchilar tilini saqlash uchun vaqtinchalik lug'at
 USER_LANG = {}
 
 def get_lang(user_id: int) -> str:
@@ -135,26 +147,22 @@ async def handle_photo(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     if supabase:
         try:
-            # 🛡 1. Dublikat chek tekshiruvi (Anti-Fraud)
             check_duplicate = supabase.table("used_receipts").select("*").eq("file_id", photo_file_id).execute()
             if check_duplicate.data:
                 await update.message.reply_text(TEXTS[lang]['duplicate_error'])
                 return
 
-            # Chekni ishlatilganlar bazasiga saqlash
             supabase.table("used_receipts").insert({"file_id": photo_file_id, "user_id": user_id}).execute()
 
-            # 2. Foydalanuvchi balansini tekshirish va yangilash
             res = supabase.table("users").select("*").eq("telegram_id", user_id).execute()
             user_data = res.data[0] if res.data else None
             
             current_balance = user_data.get("balance", 0) if user_data else 0
-            detected_payment = 30000  # Standart to'lov qiymati
+            detected_payment = 30000 
             
             new_balance = current_balance + detected_payment
             
             if new_balance >= PREMIUM_PRICE:
-                # Premium berish va balansni 0 ga tushirish
                 supabase.table("users").upsert({
                     "telegram_id": user_id,
                     "balance": 0,
@@ -162,7 +170,6 @@ async def handle_photo(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 }).execute()
                 await update.message.reply_text(TEXTS[lang]['premium_activated'], parse_mode="Markdown")
             else:
-                # Qoldiq balansni saqlash va yetmayotgan summani chiqarish
                 needed = PREMIUM_PRICE - new_balance
                 supabase.table("users").upsert({
                     "telegram_id": user_id,
@@ -179,7 +186,6 @@ async def handle_photo(update: Update, context: ContextTypes.DEFAULT_TYPE):
         except Exception as e:
             logging.error(f"Supabase xatoligi: {e}")
 
-    # 3. Adminga (8186445673) to'g'ridan-to'g'ri xabar yuborish
     if ADMIN_CHAT_ID:
         admin_text = (
             f"📥 **Yangi to'lov cheki keldi!**\n\n"
@@ -204,12 +210,14 @@ if __name__ == '__main__':
         print("XATO: BOT_TOKEN topilmadi!")
         exit(1)
         
+    # Veb-serverni orqa fonda yurgizish (Render port xatoligini to'g'rilash uchun)
+    threading.Thread(target=run_flask, daemon=True).start()
+    
     app = ApplicationBuilder().token(BOT_TOKEN).build()
     
     app.add_handler(CommandHandler("start", start))
     app.add_handler(CallbackQueryHandler(set_language, pattern="^lang_"))
     app.add_handler(MessageHandler(filters.PHOTO, handle_photo))
     
-    print("Hisob-Kitob Pay Bot to'liq va Admin bilan integratsiyalangan holda ishga tushdi...")
+    print("Hisob-Kitob Pay Bot mukammal rejimda ishga tushdi...")
     app.run_polling()
-    
