@@ -37,6 +37,7 @@ ADMIN_CHAT_ID = os.getenv("ADMIN_CHAT_ID", "8186445673")
 
 # 💳 Rasmiy To'lov Sozlamalari
 OFFICIAL_CARD = "9860 3501 4124 8996"
+CARD_HOLDER = "GʻANIYEV I."  # Karta egasining haqiqiy ismi
 PREMIUM_PRICE = 30000  # 30,000 UZS / oy
 
 # Supabase mijozini ishga tushirish
@@ -51,7 +52,7 @@ TEXTS = {
         'lang_set': "🇺🇿 Til O'zbek tiliga o'zgartirildi!",
         'pay_info': (
             "💳 **Rasmiy Karta Raqamimiz:**\n`{card}`\n"
-            "👤 **Karta Egasi:** Hisob-Kitob Rasmiy To'lov Karta\n"
+            "👤 **Karta Egasi:** {holder}\n"
             "💰 **Premium Obuna Narxi:** 30,000 so'm / oy\n\n"
             "📝 **Yo'riqnoma:**\n"
             "1. Yuqoridagi kartaga to'lov qiling.\n"
@@ -69,7 +70,7 @@ TEXTS = {
         'lang_set': "🇷🇺 Язык изменен на Русский!",
         'pay_info': (
             "💳 **Официальная карта:**\n`{card}`\n"
-            "👤 **Владелец:** Hisob-Kitob Rasmiy To'lov Karta\n"
+            "👤 **Владелец:** {holder}\n"
             "💰 **Цена Premium подписки:** 30,000 сум / месяц\n\n"
             "📝 **Инструкция:**\n"
             "1. Переведите сумму на указанную карту.\n"
@@ -87,7 +88,7 @@ TEXTS = {
         'lang_set': "🇬🇧 Language changed to English!",
         'pay_info': (
             "💳 **Official Payment Card:**\n`{card}`\n"
-            "👤 **Card Holder:** Hisob-Kitob Rasmiy To'lov Karta\n"
+            "👤 **Card Holder:** {holder}\n"
             "💰 **Premium Price:** 30,000 UZS / month\n\n"
             "📝 **Instructions:**\n"
             "1. Make transfer to the card above.\n"
@@ -132,7 +133,7 @@ async def set_language(update: Update, context: ContextTypes.DEFAULT_TYPE):
     lang = get_lang(user_id)
     await query.message.reply_text(TEXTS[lang]['lang_set'])
     
-    pay_msg = TEXTS[lang]['pay_info'].format(card=OFFICIAL_CARD)
+    pay_msg = TEXTS[lang]['pay_info'].format(card=OFFICIAL_CARD, holder=CARD_HOLDER)
     await query.message.reply_text(pay_msg, parse_mode="Markdown")
 
 async def handle_photo(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -210,7 +211,6 @@ if __name__ == '__main__':
         print("XATO: BOT_TOKEN topilmadi!")
         exit(1)
         
-    # Veb-serverni orqa fonda yurgizish (Render port xatoligini to'g'rilash uchun)
     threading.Thread(target=run_flask, daemon=True).start()
     
     app = ApplicationBuilder().token(BOT_TOKEN).build()
